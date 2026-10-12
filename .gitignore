@@ -1,0 +1,8 @@
+# Never commit secrets
+.env
+
+# Local runtime noise
+*.log
+node_modules/
+
+.godot
