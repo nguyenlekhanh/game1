@@ -350,7 +350,7 @@ func _spawn_muzzle_flash(stats: Dictionary) -> void:
 		return
 	var dir := Vector2.RIGHT.rotated(aim_angle)
 	var muzzle := global_position + dir * float(stats.get("gun_length", 40.0))
-	_fx_container.add_child(Explosion.create(muzzle, Color(1.0, 0.85, 0.3), 18.0))
+	_fx_container.add_child(Explosion.create(muzzle, Color(1.0, 0.85, 0.3), float(stats.get("muzzle_flash_radius", 16.0))))
 
 # ------------------------------------------------------------------ damage --
 

@@ -178,6 +178,19 @@ How it works (`scenes/cat_player.tscn` + `scripts/cat_player.gd`):
   `default_gun_scale`, `minigun_scale`, texture paths, or
   `use_sprites_when_available` (off = placeholder mode).
 
+## Combat effects (all code-drawn, no assets)
+
+| Moment | Effect | Where |
+| ------ | ------ | ----- |
+| Fire | Muzzle flash at the barrel tip, sized per weapon (default 14, machine gun 12, minigun 18, rocket 22 — tune `muzzle_flash_radius` in `weapon_data.gd`) | `cat_player.gd:_spawn_muzzle_flash` |
+| Flight | Glowing bullet core + short trail line | `bullet.gd:_draw` |
+| Hit | Small impact flash + enemy white hit-flash (0.09 s) | `bullet.gd:_spawn_impact`, `enemy.gd:take_damage` |
+| Kill | Shockwave ring + flash explosion, color-coded per enemy type | `enemy.gd:_spawn_explosion` |
+
+Safety caps (unchanged): max 30 live FX nodes (`Explosion.MAX_FX`), 150
+projectiles, 12 rockets — minigun streams and default-gun flashes share the
+same capped pool, so effects can't flood the renderer on a Windows PC.
+
 ## Launch + visual check
 
 ```powershell
@@ -195,6 +208,10 @@ Press **F5** (Run Project), then verify:
 4. **Weapon switching** — `F2` swaps to the minigun PNG (bigger scale),
    `F7` (or Giant-Gun expiry) restores the default gun PNG; `F1`/`F3`
    show placeholder art for machine gun / rocket.
+5. **Combat effects** — small flash at the barrel tip on every shot (default
+   gun included); glowing bullets with short trails; white blink + spark on
+   hit; ring explosion on kill. Hold `E` to spawn targets and watch with the
+   minigun (`F2`) — frame rate should stay smooth (FX capped at 30).
 
 ## Remaining manual adjustments
 
@@ -211,6 +228,8 @@ Press **F5** (Run Project), then verify:
 - [x] All required files created, no external asset references.
 - [x] Main scene configured in `project.godot`.
 - [x] Weapon/ability/boss code inspected for syntax, node paths, groups and caps.
+- [x] Combat effects audit: muzzle/trail/hit/kill FX verified in code,
+  default-gun muzzle flash added, node paths checked.
 - [ ] **Not run-tested here** — Godot executable check was impossible in this
   environment (shell tool error `spawn EFTYPE`). See "Launch + visual check"
   and "Remaining manual adjustments" above.

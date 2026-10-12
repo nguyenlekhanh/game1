@@ -20,7 +20,8 @@ const STATS := {
 		"gun_length": 36.0,
 		"gun_width": 10.0,
 		"gun_color": Color(0.5, 0.55, 0.6),
-		"muzzle_flash": false,
+		"muzzle_flash": true,
+		"muzzle_flash_radius": 14.0,
 	},
 	"machinegun": {
 		"name": "Machine Gun",
@@ -33,7 +34,8 @@ const STATS := {
 		"gun_length": 42.0,
 		"gun_width": 8.0,
 		"gun_color": Color(0.3, 0.7, 1.0),
-		"muzzle_flash": false,
+		"muzzle_flash": true,
+		"muzzle_flash_radius": 12.0,
 	},
 	"minigun": {
 		"name": "Giant Minigun",
@@ -47,6 +49,7 @@ const STATS := {
 		"gun_width": 18.0,
 		"gun_color": Color(1.0, 0.55, 0.15),
 		"muzzle_flash": true,
+		"muzzle_flash_radius": 18.0,
 	},
 	"rocket": {
 		"name": "Rocket Launcher",
@@ -61,6 +64,7 @@ const STATS := {
 		"gun_width": 20.0,
 		"gun_color": Color(0.8, 0.2, 0.2),
 		"muzzle_flash": true,
+		"muzzle_flash_radius": 22.0,
 	},
 }
 
