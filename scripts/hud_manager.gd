@@ -8,6 +8,11 @@ extends CanvasLayer
 @onready var enemy_label: Label = $TopBar/EnemyLabel
 @onready var spawn_label: Label = $TopBar/SpawnLabel
 @onready var powerup_label: Label = $PowerupLabel
+@onready var weapon_label: Label = $SubBar/WeaponLabel
+@onready var ability_label: Label = $SubBar/AbilityLabel
+@onready var boss_panel: PanelContainer = $BossPanel
+@onready var boss_bar: ProgressBar = $BossPanel/Margin/BossVBox/BossBar
+@onready var debug_label: Label = $DebugLabel
 @onready var game_over_panel: PanelContainer = $GameOverPanel
 @onready var final_score_label: Label = $GameOverPanel/Margin/VBox/FinalScoreLabel
 @onready var restart_button: Button = $GameOverPanel/Margin/VBox/RestartButton
@@ -21,6 +26,7 @@ func _ready() -> void:
 	if powerup_label != null:
 		powerup_label.visible = false
 	set_game_over_visible(false)
+	set_boss_visible(false)
 
 func _process(delta: float) -> void:
 	if _powerup_timer > 0.0:
@@ -52,6 +58,28 @@ func set_enemy_count(count: int) -> void:
 func set_spawn_interval(interval: float) -> void:
 	if spawn_label != null:
 		spawn_label.text = "SPAWN: %.2fs" % interval
+
+func set_weapon(weapon_name: String) -> void:
+	if weapon_label != null:
+		weapon_label.text = "GUN: %s" % weapon_name
+
+func set_abilities(text: String) -> void:
+	if ability_label != null:
+		ability_label.text = text
+
+func set_boss_visible(v: bool) -> void:
+	if boss_panel != null:
+		boss_panel.visible = v
+
+func set_boss_health(current: int, maximum: int) -> void:
+	set_boss_visible(true)
+	if boss_bar != null:
+		boss_bar.max_value = maxi(1, maximum)
+		boss_bar.value = maxi(0, current)
+
+func set_debug_status(text: String) -> void:
+	if debug_label != null:
+		debug_label.text = text
 
 func show_powerup_message(text: String, duration: float = 2.5) -> void:
 	if powerup_label == null:

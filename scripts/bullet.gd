@@ -10,19 +10,20 @@ var life_time: float = 2.0
 var age: float = 0.0
 var radius: float = 6.0
 
-static func create(start_pos: Vector2, direction: Vector2, bullet_damage: int = 1, bullet_speed: float = 750.0) -> Bullet:
+static func create(start_pos: Vector2, direction: Vector2, bullet_damage: int = 1, bullet_speed: float = 750.0, bullet_radius: float = 6.0) -> Bullet:
 	var b := Bullet.new()
 	b.position = start_pos
 	b.velocity = direction.normalized()
 	b.damage = bullet_damage
 	b.speed = bullet_speed
+	b.radius = bullet_radius
 	b.collision_layer = 4
 	b.collision_mask = 2
 	b.monitoring = true
 	b.monitorable = true
 	var shape := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
-	circle.radius = 6.0
+	circle.radius = maxf(3.0, bullet_radius)
 	shape.shape = circle
 	b.add_child(shape)
 	# Connect after entering tree; caller also connects. Safe-guard here:
@@ -32,6 +33,7 @@ static func create(start_pos: Vector2, direction: Vector2, bullet_damage: int = 
 
 func _ready() -> void:
 	add_to_group("bullets")
+	add_to_group("projectiles")
 	# If created via create(), signals are already connected.
 	# If created via .new() + add_child path, ensure connections exist.
 	if not body_entered.is_connected(_on_body_entered):
@@ -54,14 +56,25 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("enemies") and body.has_method("take_damage"):
 		body.take_damage(damage, velocity)
+		_spawn_impact()
 		hit_enemy.emit()
 		queue_free()
 
 func _on_area_entered(area: Area2D) -> void:
 	if area.is_in_group("enemies") and area.has_method("take_damage"):
 		area.take_damage(damage, velocity)
+		_spawn_impact()
 		hit_enemy.emit()
 		queue_free()
+
+func _spawn_impact() -> void:
+	# Small capped hit flash so minigun streams can't flood the renderer.
+	var fx_container := get_tree().get_first_node_in_group("effect_container") as Node2D
+	if fx_container == null:
+		return
+	if not Explosion.can_spawn_fx(get_tree()):
+		return
+	fx_container.add_child(Explosion.create(global_position, Color(1.0, 0.9, 0.4), 16.0))
 
 func _draw() -> void:
 	# Glowing bullet: outer glow + bright core + short trail.

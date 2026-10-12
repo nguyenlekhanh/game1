@@ -43,6 +43,14 @@ func setup(p_type: String = "chaser") -> void:
 			damage = 20
 			score_value = 3
 			body_radius = 24.0
+		"boss":
+			max_hp = 60
+			hp = 60
+			speed = 50.0
+			damage = 25
+			score_value = 20
+			body_radius = 38.0
+			add_to_group("boss")
 		_:
 			enemy_type = "chaser"
 			max_hp = 2
@@ -107,6 +115,8 @@ func _spawn_explosion() -> void:
 			col = Color(1.0, 0.3, 0.8)
 		"tank":
 			col = Color(0.7, 0.4, 1.0)
+		"boss":
+			col = Color(1.0, 0.2, 0.1)
 	var fx := ExplosionScript.create(global_position, col, body_radius + 26.0)
 	fx_container.add_child(fx)
 
@@ -119,6 +129,8 @@ func _draw() -> void:
 			_draw_speeder(c, flash)
 		"tank":
 			_draw_tank(c, flash)
+		"boss":
+			_draw_boss(c, flash)
 		_:
 			_draw_chaser(c, flash)
 	# HP pips above tanks / damaged enemies.
@@ -167,3 +179,41 @@ func _draw_tank(c: Vector2, flash: bool) -> void:
 	# Armor core.
 	draw_circle(c, 9.0, dark)
 	draw_circle(c, 5.5, Color(1.0, 0.85, 0.2) if not flash else Color.WHITE)
+
+func _draw_boss(c: Vector2, flash: bool) -> void:
+	var body := Color(0.65, 0.08, 0.10) if not flash else Color.WHITE
+	var dark := Color(0.30, 0.03, 0.05) if not flash else Color.WHITE
+	var gold := Color(1.0, 0.8, 0.2) if not flash else Color.WHITE
+	var r := body_radius
+	# Spiked outer ring.
+	var spikes := PackedVector2Array()
+	for i in range(10):
+		var a := TAU * float(i) / 10.0 + _wobble * 0.15
+		spikes.append(c + Vector2(cos(a), sin(a)) * (r + 8.0))
+		spikes.append(c + Vector2(cos(a + PI / 10.0), sin(a + PI / 10.0)) * (r - 2.0))
+	draw_colored_polygon(spikes, dark)
+	# Massive hull.
+	draw_circle(c, r, body)
+	draw_arc(c, r, 0.0, TAU, 40, dark, 5.0, true)
+	draw_arc(c, r * 0.7, 0.0, TAU, 32, Color(1.0, 0.3, 0.2, 0.8), 3.0, true)
+	# Crown.
+	var crown := PackedVector2Array([
+		c + Vector2(-20, -r + 6), c + Vector2(-20, -r - 12),
+		c + Vector2(-10, -r + 0), c + Vector2(0, -r - 14),
+		c + Vector2(10, -r + 0), c + Vector2(20, -r - 12),
+		c + Vector2(20, -r + 6),
+	])
+	draw_colored_polygon(crown, gold)
+	# Burning eyes.
+	var pulse := 0.7 + 0.3 * sin(_wobble * 2.0)
+	draw_circle(c + Vector2(-12, -4), 8.0, Color(1.0, 0.2 * pulse, 0.1))
+	draw_circle(c + Vector2(12, -4), 8.0, Color(1.0, 0.2 * pulse, 0.1))
+	draw_circle(c + Vector2(-12, -4), 3.5, Color.WHITE)
+	draw_circle(c + Vector2(12, -4), 3.5, Color.WHITE)
+	# Jagged maw.
+	draw_line(c + Vector2(-14, 16), c + Vector2(14, 16), Color(0.1, 0.0, 0.0), 4.0, true)
+	for i in range(4):
+		var fx := -10.5 + float(i) * 7.0
+		draw_colored_polygon(PackedVector2Array([
+			c + Vector2(fx, 16), c + Vector2(fx + 3.5, 22), c + Vector2(fx + 7.0, 16),
+		]), Color.WHITE)

@@ -13,7 +13,8 @@ Future goal: TikTok LIVE interactive game (viewers spawn enemies / buffs).
 - Language: **GDScript**
 - Base resolution: **1280×720** (`canvas_items` stretch, `keep` aspect)
 - Main scene: `res://scenes/main.tscn`
-- No plugins, no paid assets, no external images.
+- No plugins, no paid assets. Character/weapon art: local PNGs in `assets/`
+  with drawn-shape fallback if a file is missing.
 
 ## Project structure
 
@@ -22,16 +23,19 @@ project.godot
 scenes/
   main.tscn        # Root (GameManager) + Arena + CatPlayer + SpawnManager + Camera + HUD
   arena.tscn       # Dark futuristic arena background (drawn in code)
-  cat_player.tscn  # Orange cat commando (drawn in code)
-  enemy.tscn       # Enemy placeholder (drawn in code, 3 visual types)
+  cat_player.tscn  # Cat + BodySprite + WeaponMount/WeaponSprite, circle shape
+  enemy.tscn       # Enemy placeholder (drawn in code, 4 visual types incl. boss)
 scripts/
-  game_manager.gd  # Score, timer, game-over, restart, debug keys
-  cat_player.gd    # Auto-aim + auto-shoot, WASD movement, HP 100, rapid fire
-  enemy.gd         # chaser / speeder / tank, contact damage, hit flash, explosion
-  spawn_manager.gd # Edge spawning + difficulty ramp (1.5s -> 0.35s min, max 40)
-  hud_manager.gd   # Health, score, time, enemy count, game-over + restart button
-  bullet.gd        # Pooled by lifetime; auto-freed, never accumulates
-  explosion.gd     # Short-lived hit explosion effect
+  game_manager.gd  # Score, timer, game-over, restart, debug keys (E/F/R/F1-F7)
+  cat_player.gd    # Auto-aim, weapon system + abilities (LIVE-bridge API), HP 100
+  weapon_data.gd   # Central weapon stat table (damage, fire rate, visuals)
+  enemy.gd         # chaser / speeder / tank / boss, contact damage, hit flash
+  spawn_manager.gd # Edge spawning + difficulty ramp + guarded boss spawn
+  hud_manager.gd   # Health, score, time, weapon, ability timers, boss bar, debug
+  bullet.gd        # Lifetime-pooled bullets + capped impact flashes
+  rocket.gd        # Homing rockets with capped AoE explosions
+  mega_laser.gd    # Charge-up arena beam, self-freeing
+  explosion.gd     # Short-lived effects + global FX cap (MAX_FX = 30)
   arena.gd         # Background/grid/neon border drawing
 README.md
 ```
@@ -44,15 +48,17 @@ README.md
 | 2     | Enemy    | 1 (player) |
 | 4     | Bullet   | 2 (enemy)  |
 
-Bullets are `Area2D` and detect enemy bodies. Contact damage uses a
-per-enemy 0.8 s cooldown with distance checks. Bullets live max 2 s and are
-freed outside the arena; enemies are capped (`max_enemies = 40`, absolute
-debug cap 50); explosions free themselves after 0.35 s.
+Bullets/rockets are `Area2D` on layer 4 (mask 2) and detect enemy bodies.
+Contact damage uses a per-enemy 0.8 s cooldown with distance checks.
+Bullets live max 2 s, rockets max 3 s, both freed outside the arena;
+enemies are capped (`max_enemies = 40`, absolute debug cap 50);
+projectiles capped at 150 (rockets 12); explosions capped at 30 FX nodes.
 
 ### Signals
 
-- `CatPlayer.health_changed / died / fired`
+- `CatPlayer.health_changed / died / fired / weapon_changed`
 - `Enemy.died(enemy, score_value)` → `GameManager._on_enemy_died`
+- `Rocket.exploded`
 - `SpawnManager.enemy_count_changed`
 - `GameManager.score_changed / game_over`
 
@@ -81,9 +87,34 @@ Then press **F5** (Run Project). The main scene is already set to
 
 - The **cat aims and shoots automatically** at the nearest living enemy.
 - Enemies spawn at the arena edges and walk toward the cat.
-- Bullets kill enemies → **score increases** (chaser +1, speeder +1, tank +3).
-- Enemies deal contact damage (chaser 10, speeder 6, tank 20). Cat has **100 HP**.
+- Bullets kill enemies → **score increases** (chaser +1, speeder +1, tank +3, boss +20).
+- Enemies deal contact damage (chaser 10, speeder 6, tank 20, boss 25). Cat has **100 HP**.
 - Survive as long as possible. **Game over at 0 HP** → click **RESTART** (or `R`).
+
+## Weapons (local now, TikTok-gift triggered later)
+
+All stats live in `scripts/weapon_data.gd`. No TikTok integration yet.
+
+| Weapon | How it feels | Key stats |
+| ------ | ------------ | --------- |
+| Default Gun (fallback) | Unchanged original behavior | 0.35 s interval, dmg 1 |
+| Machine Gun | Faster, smaller bullets, blue-tinted gun | 0.15 s interval, radius 4, dmg 1 |
+| Giant Minigun | Triple barrels, 3-bullet fan per shot, muzzle flashes, impact sparks | 0.10 s interval, dmg 1 |
+| Rocket Launcher | Slow homing rockets, big AoE explosion on impact | 0.9 s interval, dmg 3 + 3 AoE (r 120) |
+
+The cat's drawn weapon visibly changes per gun (size, barrels, colors).
+
+## Special abilities
+
+| Ability | Effect | Config |
+| ------- | ------ | ------ |
+| Rapid Fire | Fire interval ×0.35 while active, previous rate restored automatically on expiry | 5 s, `F`/`F6` |
+| Giant Gun | Temporarily switches to Giant Minigun with a visible HUD countdown, then restores the previous weapon | 8 s |
+| Mega Laser | 0.6 s charge-up glow, then a bright beam across the arena damaging all enemies it touches | dmg 6, 8 s cooldown, `F4` |
+| Boss Summon | Spawns one crowned boss (60 HP, fast for its size, 25 contact dmg, +20 score) with a HUD boss bar; only one boss at a time | `F5` |
+
+Abilities compose safely (e.g. Rapid Fire + Giant Gun multiply); laser has a
+cooldown so it can't be spammed.
 
 ## Controls
 
@@ -91,12 +122,23 @@ Then press **F5** (Run Project). The main scene is already set to
 | ------------------ | --------------------------------------------------- |
 | `W` `A` `S` `D` / Arrows | Move the cat (optional; combat is automatic) |
 | `E`                | **Debug:** spawn one enemy immediately              |
-| `F`                | **Debug:** rapid-fire power-up for 5 s              |
+| `F` or `F6`        | **Debug:** rapid-fire power-up for 5 s              |
+| `F1`               | **Debug:** switch to Machine Gun                    |
+| `F2`               | **Debug:** switch to Giant Minigun                  |
+| `F3`               | **Debug:** switch to Rocket Launcher                |
+| `F4`               | **Debug:** fire Mega Laser (8 s cooldown)           |
+| `F5`               | **Debug:** summon boss (one at a time)              |
+| `F7`               | **Debug:** restore Default Gun                      |
 | `R`                | Restart (only after game over)                      |
 | Restart button     | Restart the run (mouse / touch)                     |
 
-HUD shows: **health bar + HP, score, elapsed time, enemy count, spawn interval**,
-plus a controls hint line and a rapid-fire notice.
+> Note: `F5` is also the Godot editor's "Run" shortcut, but at game runtime it
+> safely triggers the boss summon. No conflicts with the original `E`/`F`/`R`
+> keys, so no remapping was needed.
+
+HUD shows: **health bar + HP, score, elapsed time, enemy count, spawn interval,
+active gun, ability timers + laser cooldown, boss bar (only while a boss is
+alive), and a debug line with enemy / projectile / FX counts**.
 
 ## Difficulty
 
@@ -107,22 +149,68 @@ plus a controls hint line and a rapid-fire notice.
 
 ## Swapping in AI sprites later (First Milestone)
 
-Graphics are isolated in `_draw()` functions:
+Cat + guns already use PNGs (see "Character & weapon sprites" below).
+Still placeholder-drawn: enemies (`_draw_chaser/_draw_speeder/_draw_tank/
+_draw_boss`), bullets, background. No gameplay code depends on placeholder art.
 
-- Cat → `scripts/cat_player.gd` (`CatPlayer._draw`)
-- Enemies → `scripts/enemy.gd` (`_draw_chaser/_draw_speeder/_draw_tank`)
-- Bullets → `scripts/bullet.gd` (`_draw`)
-- Background → `scripts/arena.gd` (`_draw`)
+## Character & weapon sprites
 
-To replace with PNGs: add `Sprite2D` nodes under the same roots, assign the
-textures, and delete/skip the `_draw()` bodies. No gameplay code depends on
-the placeholder art.
+| Slot | File | Used when |
+| ---- | ---- | --------- |
+| Cat body | `assets/characters/cat_idle.png` | Always (if present) |
+| Default gun | `assets/weapons/gun_default.png` | Default Gun equipped |
+| Minigun | `assets/weapons/gun_minigun.png` | Giant Minigun active |
+| Machine gun / rocket | — (no PNG yet) | Placeholder art is drawn |
+
+How it works (`scenes/cat_player.tscn` + `scripts/cat_player.gd`):
+
+- `BodySprite` (Sprite2D) shows the cat; `WeaponMount` (Node2D marker) +
+  `WeaponSprite` (Sprite2D) shows the gun. Textures load at runtime via
+  `ResourceLoader.exists()` — a missing/corrupt file logs a warning and the
+  game falls back to the original drawn placeholder. Nothing crashes.
+- The mount rotates to the aim angle every frame; the gun flips vertically
+  and the cat flips horizontally when aiming left, so aiming never breaks
+  the attachment. Firing math (spawn point, rate, damage, cooldowns) is
+  untouched — only visuals switch, and the default gun returns automatically
+  when Giant Gun expires.
+- Tune without code edits (Godot Inspector → select `CatPlayer` → Script
+  Variables → **Sprites** group): `cat_sprite_scale`, `weapon_offset`,
+  `default_gun_scale`, `minigun_scale`, texture paths, or
+  `use_sprites_when_available` (off = placeholder mode).
+
+## Launch + visual check
+
+```powershell
+godot --path "C:\khanh\cat-commando"
+```
+
+Press **F5** (Run Project), then verify:
+
+1. **Character** — cat PNG visible (~collision-circle sized), flips when
+   enemies approach from the left.
+2. **Weapon alignment** — gun sits beside the cat and rotates to track the
+   nearest enemy; not upside-down when aiming left.
+3. **Automatic shooting** — bullets spawn toward enemies with no input
+   (move with WASD optionally).
+4. **Weapon switching** — `F2` swaps to the minigun PNG (bigger scale),
+   `F7` (or Giant-Gun expiry) restores the default gun PNG; `F1`/`F3`
+   show placeholder art for machine gun / rocket.
+
+## Remaining manual adjustments
+
+- [ ] Sprite scales were set blind (`cat 0.25`, `default gun 0.4`,
+  `minigun 0.5`) — resize in the Inspector if the art is too big/small.
+- [ ] `weapon_offset` (default `10, 8`) may need nudging so the gun grip
+  meets the cat's paws for your art.
+- [ ] If a gun PNG points sideways-left instead of right, rotate
+  `WeaponSprite` 180° or flip it in the Inspector.
+- [ ] Machine gun / rocket launcher still use placeholder art (no PNGs).
 
 ## Verification status
 
 - [x] All required files created, no external asset references.
 - [x] Main scene configured in `project.godot`.
+- [x] Weapon/ability/boss code inspected for syntax, node paths, groups and caps.
 - [ ] **Not run-tested here** — Godot executable check was impossible in this
-  environment (shell tool error `spawn EFTYPE`). Please run F5 in the editor
-  and report any errors; likely spots to check are the `[input]` map block
-  and HUD node paths.
+  environment (shell tool error `spawn EFTYPE`). See "Launch + visual check"
+  and "Remaining manual adjustments" above.

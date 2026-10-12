@@ -43,6 +43,39 @@ func _process(delta: float) -> void:
 func get_enemy_count() -> int:
 	return get_tree().get_nodes_in_group("enemies").size()
 
+func get_boss() -> Enemy:
+	for b in get_tree().get_nodes_in_group("boss"):
+		if b != null and is_instance_valid(b) and b.get("alive") == true:
+			return b as Enemy
+	return null
+
+func has_boss() -> bool:
+	return get_boss() != null
+
+func spawn_boss() -> Enemy:
+	# Guard: only one boss at a time; repeated inputs return the live boss.
+	var existing := get_boss()
+	if existing != null:
+		return existing
+	if enemy_scene == null:
+		push_warning("SpawnManager: enemy_scene is not assigned.")
+		return null
+	if get_enemy_count() >= max_enemies + 10:
+		return null
+	var boss := enemy_scene.instantiate() as Enemy
+	boss.setup("boss")
+	boss.position = _random_edge_position()
+	var gm := get_tree().get_first_node_in_group("game_manager")
+	if gm != null and gm.has_method("_on_enemy_died"):
+		if not boss.died.is_connected(Callable(gm, "_on_enemy_died")):
+			boss.died.connect(Callable(gm, "_on_enemy_died"))
+	var parent_node := get_parent()
+	if parent_node == null:
+		parent_node = self
+	parent_node.add_child.call_deferred(boss)
+	enemy_count_changed.emit(get_enemy_count())
+	return boss
+
 func spawn_enemy(force_type: String = "") -> Enemy:
 	if enemy_scene == null:
 		push_warning("SpawnManager: enemy_scene is not assigned.")
