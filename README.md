@@ -37,6 +37,13 @@ scripts/
   mega_laser.gd    # Charge-up arena beam, self-freeing
   explosion.gd     # Short-lived effects + global FX cap (MAX_FX = 30)
   arena.gd         # Background/grid/neon border drawing
+  live_bridge.gd   # Local TCP command bridge (127.0.0.1:8765) for LIVE gifts
+tools/tiktok_bridge/
+  connector.py     # TikTok LIVE -> game bridge (needs TikTokLive package)
+  bridge_client.py # Stdlib-only TCP client for the game bridge
+  simulate.py      # Fake-gift test script (no TikTok needed)
+  gift_mapping.json# Your username + gift-name -> game-command mapping
+  requirements.txt # Python dependencies (TikTokLive)
 README.md
 ```
 
@@ -263,6 +270,124 @@ Press **F5** (Run Project), then verify:
   `WeaponSprite` 180° or flip it in the Inspector.
 - [ ] Machine gun / rocket launcher still use placeholder art (no PNGs).
 
+## TikTok LIVE bridge (viewers control the game with gifts)
+
+How it works: the game listens on **127.0.0.1:8765** (`scripts/live_bridge.gd`).
+A separate Python process translates TikTok gift events into game commands and
+sends them over that loopback connection. Gifts reuse the exact same code paths
+as the keyboard debug keys, so behavior is identical. No TikTok password,
+cookies, or keys are ever needed — only your public @username.
+
+> TikTokLive is an **unofficial, reverse-engineered library** (modified AGPL;
+> it runs as a separate process and is not part of the game). TikTok may change
+> its protocol at any time; connection failures are reported as errors, never
+> faked as success.
+
+Default gift examples (edit names in `tools/tiktok_bridge/gift_mapping.json`):
+
+| Gift example | Game command | Safety |
+| ------------ | ------------ | ------ |
+| Rose | Rapid fire 5 s | 8 s command cooldown |
+| GG | Giant minigun | 20 s cooldown, auto-restores |
+| TikTok | Enemy wave (2/gift, max 10) | Enemy caps enforced |
+| Money Gun / Sports Car | Minigun / rocket loadout | 5 s cooldown |
+| Galaxy / Lion | Summon Iron Behemoth (queued, see below) | Max 3 active, queue 100, immediate when a slot is free |
+| Universe | Mega laser | 8 s laser + 10 s command cooldown |
+
+Streakable gifts fire the game command **once at streak end** (using the
+streak's total as quantity); unmapped gifts are logged and ignored.
+
+### Boss summon queue (Galaxy / Lion gifts)
+
+One completed gift = exactly one summon request. The bridge ignores the
+message `count` for boss summons (streak totals arrive as one final event;
+the default Galaxy mapping is one gift = one boss).
+
+- Up to **3 living bosses** at once (`SpawnManager.MAX_ACTIVE_BOSSES`).
+  Gifts spawn immediately while a slot is free — no summon cooldown waits.
+- 3 active → the request stays queued (max `boss_queue_max` = 100,
+  Inspector-editable); each boss death spawns exactly one queued boss.
+- Full queue → explicit `queue_full` error (never silent).
+- Entries are removed only after `spawn_boss()` succeeds: exactly-once.
+- Retried connector deliveries reuse a per-gift UUID (`event_id`); repeats
+  are rejected as `duplicate_event` (seen-ID window: 500 entries / 10 min).
+  Messages without an ID are never deduped, so distinct gifts from the same
+  viewer are never suppressed.
+- Console logs (`[BossQueue] Gift accepted / Spawned boss / Queued one boss /
+  Boss died / Game over: queue cleared`) plus the in-game
+  `Active Bosses: X/3 / Bosses Queued: Y/100` label and `status` counts
+  (`active_bosses`, `queue_size`, `player_hp`) make every transition visible.
+- Game-over clears the queue (restart recreates it empty).
+- Keyboard `F5` still summons directly (refused while any boss lives) and all
+  other gifts/keys are unchanged. The old 20 s post-kill timer is kept only
+  for observability; it no longer gates spawns.
+
+### 1. Run the Godot game
+
+```powershell
+godot --path "C:\khanh\cat-commando"
+```
+
+Press **F5**. The console log should show `[LiveBridge] listening on 127.0.0.1:8765`.
+Keep the game window focused for keyboard tests, or unfocused — gifts work either way.
+
+### 2. Set up Python (one time)
+
+```powershell
+cd C:\khanh\cat-commando\tools\tiktok_bridge
+pip install -r requirements.txt
+```
+
+This installs only the `TikTokLive` package (plus its own dependencies).
+No existing project files are touched — there were no prior Python
+dependencies in this repo.
+
+### 3. Enter your TikTok username
+
+Either edit `gift_mapping.json` (`"tiktok_username": "YourName"`) or pass it
+on the command line (recommended, no file edit):
+
+```powershell
+python connector.py --user @YourName
+```
+
+### 4. Test with fake gifts (no LIVE needed)
+
+With the game running:
+
+```powershell
+cd C:\khanh\cat-commando\tools\tiktok_bridge
+python simulate.py
+```
+
+Expect 28/28 PASS (editor/debug build required; the script resets boss
+state itself, then verifies): reset to 0/0, 3× single gifts → 3 active,
+4th–6th gifts queue one-by-one, run-unique event_id dedup, 96 singles fill
+to exactly 100, `queue_full` on overflow, one death → 3 active/99 queued,
+second death → 98, full death-drain to 0/0, plus the unchanged
+ping/cooldown/wave/weapon/rejection/reconnect checks.
+Replies are parsed as JSON (Godot emits compact spacing).
+Then manually confirm `E/F/F1-F7/R` keys still work in the game window.
+
+### 5. Connect to a real public LIVE session
+
+1. Start your TikTok LIVE on your phone.
+2. Run the game, then: `python connector.py --user @YourName`
+3. The connector first checks you are LIVE, prints the active mappings, then
+   forwards each gift (streaks resolved once at streak end).
+4. Stop with Ctrl+C. If the stream ends, the connector exits cleanly.
+
+### 6. Troubleshooting
+
+| Symptom | Meaning / fix |
+| ------- | ------------- |
+| `Cannot reach the game at 127.0.0.1:8765` | Game isn't running — launch it first. |
+| `@user is not LIVE right now` | Start the TikTok LIVE, then retry; or use `simulate.py`. |
+| Sign/API errors from TikTokLive | TikTok changed its protocol or rate-limited signing — run `pip install -U TikTokLive`; check the TikTokLive GitHub/Discord. |
+| Gifts logged as "Unmapped" | Gift name isn't in `gift_mapping.json` — add the exact name shown in the log. |
+| Commands rejected `on_cooldown` | Working as designed (anti-spam); wait or lower cooldowns in the Inspector (`LiveBridge` node → Script Variables). |
+| Port already in use | Stop the other bridge/sim, or change the port on the `LiveBridge` node in the Inspector and pass the same `--port` to the Python scripts. |
+
 ## Verification status
 
 - [x] All required files created, no external asset references.
@@ -272,6 +397,14 @@ Press **F5** (Run Project), then verify:
   default-gun muzzle flash added, node paths checked.
 - [x] Iron Behemoth: state machine, 3 attacks, enrage-once, death cleanup,
   cooldown, HUD bar/title/banners inspected; node paths and groups verified.
-- [ ] **Not run-tested here** — Godot executable check was impossible in this
-  environment (shell tool error `spawn EFTYPE`). See "Launch + visual check"
-  (boss checklist item 6) and "Remaining manual adjustments" above.
+- [x] LIVE bridge: GDScript + Python code re-read for syntax, API names
+  verified against project code and TikTokLive 7.x docs; no gameplay edits
+  beyond a 3-line bridge hook; keyboard controls untouched.
+- [x] Boss queue v3 (one gift = one request): quantity fan-out removed,
+  game-over queue clear, death-transition logging, run-isolated 28-check
+  simulator suite (reset phase, exact-count asserts) — all re-read; no shell
+  to execute anything.
+- [ ] **Not run-tested here** — shell is unavailable in this environment
+  (`spawn EFTYPE`), so the simulator could not be executed and no Godot
+  headless check was possible. **28/28 is expected, not measured.** Run
+  `python tools/tiktok_bridge/simulate.py` with the game open and report.

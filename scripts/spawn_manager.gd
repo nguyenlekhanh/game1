@@ -3,6 +3,10 @@ extends Node2D
 
 signal enemy_count_changed(count: int)
 
+# LIVE gift rule: up to 3 living bosses at once. Keyboard F5 keeps its
+# "one manual summon, refused while any boss lives" behavior via has_boss().
+const MAX_ACTIVE_BOSSES := 3
+
 const ARENA_MIN := Vector2(60, 90)
 const ARENA_MAX := Vector2(1220, 660)
 
@@ -14,7 +18,6 @@ const ARENA_MAX := Vector2(1220, 660)
 @export var max_enemies: int = 40
 @export var auto_spawn: bool = true
 @export var boss_cooldown: float = 20.0
-
 var current_interval: float = 1.5
 var _spawn_timer: float = 0.0
 var _ramp_timer: float = 0.0
@@ -53,6 +56,14 @@ func get_boss() -> Enemy:
 			return b as Enemy
 	return null
 
+func boss_count() -> int:
+	# Living, active bosses only.
+	var n := 0
+	for b in get_tree().get_nodes_in_group("boss"):
+		if b != null and is_instance_valid(b) and b.get("alive") == true:
+			n += 1
+	return n
+
 func has_boss() -> bool:
 	return get_boss() != null
 
@@ -60,16 +71,17 @@ func get_boss_cooldown_left() -> float:
 	return maxf(0.0, _boss_cd)
 
 func spawn_boss() -> Enemy:
-	# Guard: only one boss at a time; repeated inputs return the live boss.
-	var existing := get_boss()
-	if existing != null:
-		return existing
-	# Cooldown after the previous boss died: no boss spam.
-	if _boss_cd > 0.0:
-		return null
 	if enemy_scene == null:
 		push_warning("SpawnManager: enemy_scene is not assigned.")
 		return null
+	# Concurrency cap: never more than MAX_ACTIVE_BOSSES living bosses.
+	# Returns the existing boss (non-null) when full so callers can tell
+	# "no new spawn" apart from a null failure (missing scene / enemy cap).
+	if boss_count() >= MAX_ACTIVE_BOSSES:
+		return get_boss()
+	# NOTE: the post-kill _boss_cd timer is intentionally NOT enforced here.
+	# LIVE rules require an immediate spawn whenever a slot is free; the
+	# timer is kept only for observability (status replies, F5 message).
 	if get_enemy_count() >= max_enemies + 10:
 		return null
 	var boss := enemy_scene.instantiate() as Enemy

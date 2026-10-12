@@ -1,0 +1,4 @@
+# Cat Commando TikTok LIVE connector dependencies.
+# Checked against the published TikTokLive API (docs verified 2026; v7.x).
+# Install with:  pip install -r requirements.txt
+TikTokLive>=7.0.1

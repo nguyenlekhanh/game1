@@ -16,6 +16,10 @@ var kills: int = 0
 func _ready() -> void:
 	add_to_group("game_manager")
 	randomize()
+	# Local TikTok LIVE bridge: passive listener, gameplay untouched.
+	var bridge := LiveBridge.new()
+	bridge.name = "LiveBridge"
+	add_child(bridge)
 	if player != null:
 		if not player.died.is_connected(_on_player_died):
 			player.died.connect(_on_player_died)
@@ -131,11 +135,15 @@ func _trigger_boss() -> void:
 			hud.show_powerup_message("BOSS ALREADY ACTIVE!")
 		get_viewport().set_input_as_handled()
 		return
+	# LIVE rule: spawn immediately when a slot is free (no summon cooldown).
 	var boss := spawn_manager.spawn_boss()
 	if boss != null and hud != null:
 		hud.show_powerup_message("IRON BEHEMOTH INCOMING!", 4.0)
 	elif hud != null:
-		hud.show_powerup_message("BOSS RECHARGING... (%.0fs)" % spawn_manager.get_boss_cooldown_left())
+		if spawn_manager.get_boss_cooldown_left() > 0.0:
+			hud.show_powerup_message("BOSS RECHARGING... (%.0fs)" % spawn_manager.get_boss_cooldown_left())
+		else:
+			hud.show_powerup_message("BOSS SUMMON FAILED (enemy cap)!")
 	get_viewport().set_input_as_handled()
 
 func _on_boss_enraged(_boss: Enemy) -> void:

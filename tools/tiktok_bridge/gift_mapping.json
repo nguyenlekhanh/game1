@@ -1,0 +1,29 @@
+{
+  "_comment": "Cat Commando TikTok LIVE gift mapping. Edit freely: keys are gift names (matched case-insensitively), values must be game commands from COMMANDS. Cooldowns are enforced by the game; quantities scale spawn_wave only.",
+  "tiktok_username": "",
+  "godot_host": "127.0.0.1",
+  "godot_port": 8765,
+  "COMMANDS": [
+    "rapid_fire",
+    "giant_gun",
+    "weapon_minigun",
+    "weapon_rocket",
+    "weapon_machinegun",
+    "weapon_default",
+    "mega_laser",
+    "spawn_wave",
+    "summon_boss"
+  ],
+  "mappings": {
+    "Rose": "rapid_fire",
+    "GG": "giant_gun",
+    "TikTok": "spawn_wave",
+    "Money Gun": "weapon_minigun",
+    "Sports Car": "weapon_rocket",
+    "Galaxy": "summon_boss",
+    "Lion": "summon_boss",
+    "Universe": "mega_laser"
+  },
+  "wave_enemies_per_gift": 2,
+  "wave_max": 10
+}

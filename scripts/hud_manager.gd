@@ -12,6 +12,7 @@ extends CanvasLayer
 @onready var ability_label: Label = $SubBar/AbilityLabel
 @onready var boss_panel: PanelContainer = $BossPanel
 @onready var boss_bar: ProgressBar = $BossPanel/Margin/BossVBox/BossBar
+@onready var boss_queue_label: Label = $BossQueueLabel
 @onready var debug_label: Label = $DebugLabel
 @onready var game_over_panel: PanelContainer = $GameOverPanel
 @onready var final_score_label: Label = $GameOverPanel/Margin/VBox/FinalScoreLabel
@@ -81,6 +82,19 @@ func set_boss_enraged(enraged: bool) -> void:
 	# Clear ENRAGED indicator: red-tinted boss bar while enraged.
 	if boss_bar != null:
 		boss_bar.modulate = Color(1.0, 0.35, 0.3) if enraged else Color.WHITE
+
+func set_boss_queue(count: int) -> void:
+	# Legacy single-count form: active count unknown, show queue only.
+	set_boss_status(0, count, 3, count if count > 0 else 0)
+
+func set_boss_status(active: int, queued: int, active_max: int = 3, queue_max: int = 100) -> void:
+	# "Active Bosses: X/3 / Bosses Queued: Y/100" indicator.
+	if boss_queue_label == null:
+		return
+	var show := active > 0 or queued > 0
+	boss_queue_label.visible = show
+	if show:
+		boss_queue_label.text = "Active Bosses: %d/%d\nBosses Queued: %d/%d" % [active, active_max, queued, queue_max]
 
 func set_debug_status(text: String) -> void:
 	if debug_label != null:

@@ -131,6 +131,19 @@ max_value = 60.0
 value = 60.0
 show_percentage = false
 
+[node name="BossQueueLabel" type="Label" parent="HUD"]
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 188.0
+offset_right = 200.0
+offset_bottom = 236.0
+theme_override_colors/font_color = Color(1, 0.6, 0.2, 1)
+theme_override_font_sizes/font_size = 16
+text = "Active Bosses: 0/3\nBosses Queued: 0/100"
+horizontal_alignment = 1
+
 [node name="DebugLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = -58.0
