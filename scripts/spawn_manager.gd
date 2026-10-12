@@ -13,10 +13,12 @@ const ARENA_MAX := Vector2(1220, 660)
 @export var ramp_every_seconds: float = 10.0
 @export var max_enemies: int = 40
 @export var auto_spawn: bool = true
+@export var boss_cooldown: float = 20.0
 
 var current_interval: float = 1.5
 var _spawn_timer: float = 0.0
 var _ramp_timer: float = 0.0
+var _boss_cd: float = 0.0
 var running: bool = true
 
 func _ready() -> void:
@@ -27,6 +29,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not running:
 		return
+	if _boss_cd > 0.0:
+		_boss_cd -= delta
 	# Difficulty ramp: spawn faster over time, clamped at min_interval.
 	_ramp_timer += delta
 	if _ramp_timer >= ramp_every_seconds:
@@ -52,11 +56,17 @@ func get_boss() -> Enemy:
 func has_boss() -> bool:
 	return get_boss() != null
 
+func get_boss_cooldown_left() -> float:
+	return maxf(0.0, _boss_cd)
+
 func spawn_boss() -> Enemy:
 	# Guard: only one boss at a time; repeated inputs return the live boss.
 	var existing := get_boss()
 	if existing != null:
 		return existing
+	# Cooldown after the previous boss died: no boss spam.
+	if _boss_cd > 0.0:
+		return null
 	if enemy_scene == null:
 		push_warning("SpawnManager: enemy_scene is not assigned.")
 		return null
@@ -66,15 +76,23 @@ func spawn_boss() -> Enemy:
 	boss.setup("boss")
 	boss.position = _random_edge_position()
 	var gm := get_tree().get_first_node_in_group("game_manager")
-	if gm != null and gm.has_method("_on_enemy_died"):
-		if not boss.died.is_connected(Callable(gm, "_on_enemy_died")):
-			boss.died.connect(Callable(gm, "_on_enemy_died"))
+	if gm != null:
+		if gm.has_method("_on_enemy_died"):
+			if not boss.died.is_connected(Callable(gm, "_on_enemy_died")):
+				boss.died.connect(Callable(gm, "_on_enemy_died"))
+		if gm.has_method("_on_boss_enraged"):
+			if not boss.enraged.is_connected(Callable(gm, "_on_boss_enraged")):
+				boss.enraged.connect(Callable(gm, "_on_boss_enraged"))
 	var parent_node := get_parent()
 	if parent_node == null:
 		parent_node = self
 	parent_node.add_child.call_deferred(boss)
 	enemy_count_changed.emit(get_enemy_count())
 	return boss
+
+func notify_boss_defeated() -> void:
+	# Starts the cooldown window before another boss may be summoned.
+	_boss_cd = boss_cooldown
 
 func spawn_enemy(force_type: String = "") -> Enemy:
 	if enemy_scene == null:

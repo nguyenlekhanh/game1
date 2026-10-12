@@ -77,6 +77,11 @@ func set_boss_health(current: int, maximum: int) -> void:
 		boss_bar.max_value = maxi(1, maximum)
 		boss_bar.value = maxi(0, current)
 
+func set_boss_enraged(enraged: bool) -> void:
+	# Clear ENRAGED indicator: red-tinted boss bar while enraged.
+	if boss_bar != null:
+		boss_bar.modulate = Color(1.0, 0.35, 0.3) if enraged else Color.WHITE
+
 func set_debug_status(text: String) -> void:
 	if debug_label != null:
 		debug_label.text = text

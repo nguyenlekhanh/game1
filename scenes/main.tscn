@@ -122,7 +122,7 @@ alignment = 1
 [node name="BossTitle" type="Label" parent="HUD/BossPanel/Margin/BossVBox"]
 theme_override_colors/font_color = Color(1, 0.3, 0.2, 1)
 theme_override_font_sizes/font_size = 18
-text = "BOSS"
+text = "IRON BEHEMOTH"
 horizontal_alignment = 1
 
 [node name="BossBar" type="ProgressBar" parent="HUD/BossPanel/Margin/BossVBox"]

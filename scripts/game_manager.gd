@@ -53,6 +53,7 @@ func _refresh_boss_bar() -> void:
 		hud.set_boss_visible(false)
 	else:
 		hud.set_boss_health(int(boss.get("hp")), int(boss.get("max_hp")))
+		hud.set_boss_enraged(bool(boss.get("is_enraged")))
 
 func _debug_status_text() -> String:
 	var fx := 0
@@ -132,8 +133,16 @@ func _trigger_boss() -> void:
 		return
 	var boss := spawn_manager.spawn_boss()
 	if boss != null and hud != null:
-		hud.show_powerup_message("WARNING: BOSS INCOMING!")
+		hud.show_powerup_message("IRON BEHEMOTH INCOMING!", 4.0)
+	elif hud != null:
+		hud.show_powerup_message("BOSS RECHARGING... (%.0fs)" % spawn_manager.get_boss_cooldown_left())
 	get_viewport().set_input_as_handled()
+
+func _on_boss_enraged(_boss: Enemy) -> void:
+	if not running:
+		return
+	if hud != null:
+		hud.show_powerup_message("BEHEMOTH ENRAGED!", 3.0)
 
 func _on_enemy_died(_enemy: Enemy, score_value: int) -> void:
 	if not running:
@@ -143,6 +152,11 @@ func _on_enemy_died(_enemy: Enemy, score_value: int) -> void:
 	score_changed.emit(score)
 	if hud != null:
 		hud.set_score(score)
+		# Boss reward is awarded exactly once via the single died emission.
+		if _enemy != null and is_instance_valid(_enemy) and _enemy.is_in_group("boss"):
+			hud.show_powerup_message("BOSS DEFEATED! +%d" % score_value, 4.0)
+			if spawn_manager != null:
+				spawn_manager.notify_boss_defeated()
 
 func _on_player_health_changed(current: int, maximum: int) -> void:
 	if hud != null:

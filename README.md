@@ -87,7 +87,7 @@ Then press **F5** (Run Project). The main scene is already set to
 
 - The **cat aims and shoots automatically** at the nearest living enemy.
 - Enemies spawn at the arena edges and walk toward the cat.
-- Bullets kill enemies → **score increases** (chaser +1, speeder +1, tank +3, boss +20).
+- Bullets kill enemies → **score increases** (chaser +1, speeder +1, tank +3, Iron Behemoth +50).
 - Enemies deal contact damage (chaser 10, speeder 6, tank 20, boss 25). Cat has **100 HP**.
 - Survive as long as possible. **Game over at 0 HP** → click **RESTART** (or `R`).
 
@@ -111,7 +111,7 @@ The cat's drawn weapon visibly changes per gun (size, barrels, colors).
 | Rapid Fire | Fire interval ×0.35 while active, previous rate restored automatically on expiry | 5 s, `F`/`F6` |
 | Giant Gun | Temporarily switches to Giant Minigun with a visible HUD countdown, then restores the previous weapon | 8 s |
 | Mega Laser | 0.6 s charge-up glow, then a bright beam across the arena damaging all enemies it touches | dmg 6, 8 s cooldown, `F4` |
-| Boss Summon | Spawns one crowned boss (60 HP, fast for its size, 25 contact dmg, +20 score) with a HUD boss bar; only one boss at a time | `F5` |
+| Boss Summon | Summons the Iron Behemoth (see Boss section); one at a time + 20 s post-kill cooldown | `F5` |
 
 Abilities compose safely (e.g. Rapid Fire + Giant Gun multiply); laser has a
 cooldown so it can't be spammed.
@@ -127,7 +127,7 @@ cooldown so it can't be spammed.
 | `F2`               | **Debug:** switch to Giant Minigun                  |
 | `F3`               | **Debug:** switch to Rocket Launcher                |
 | `F4`               | **Debug:** fire Mega Laser (8 s cooldown)           |
-| `F5`               | **Debug:** summon boss (one at a time)              |
+| `F5`               | **Debug:** summon Iron Behemoth (one at a time, 20 s cooldown after a kill) |
 | `F7`               | **Debug:** restore Default Gun                      |
 | `R`                | Restart (only after game over)                      |
 | Restart button     | Restart the run (mouse / touch)                     |
@@ -139,6 +139,32 @@ cooldown so it can't be spammed.
 HUD shows: **health bar + HP, score, elapsed time, enemy count, spawn interval,
 active gun, ability timers + laser cooldown, boss bar (only while a boss is
 alive), and a debug line with enemy / projectile / FX counts**.
+
+## Boss: Iron Behemoth
+
+Large armored monster drawn in code (dark metal plates, pauldrons, horns,
+pulsing orange core) — ~2.5–3× a chaser. Reuses `enemy.tscn`, the bullet
+damage system, the `died` → score signal, and the capped `Explosion` FX.
+
+- **Stats** (`BOSS_CONFIG` in `scripts/enemy.gd`): 150 HP, speed 55,
+  25 contact damage, **+50 score**, radius 40, arena-clamped chase.
+- **Attacks** (chase → telegraph → execute state machine, boss holds still
+  while telegraphing):
+  1. **Energy Burst** — 0.8 s converging-arc telegraph, then a 5-shot orange
+     fan (`scripts/enemy_bullet.gd`: dmg 8, speed 330, 2.5 s life, capped
+     impact FX, auto-cleaned).
+  2. **Ground Slam** — 0.7 s red-ring wind-up, shockwave (r 260) damages the
+     cat **once** and only inside the ring; 7 s cooldown; used in melee range.
+  3. **Enrage** — triggers **once** below 30% HP: red aura + red HUD bar +
+     `BEHEMOTH ENRAGED!` banner, attacks every 2.8 s (from 5 s), 1.4× speed.
+- **HUD**: big `IRON BEHEMOTH` bar near the top (polled every frame),
+  `IRON BEHEMOTH INCOMING!` / `BOSS DEFEATED! +50` banners via the existing
+  announcement label. No duplicate bars.
+- **Death**: attacks stop, its projectiles are cleared, one big 0.8 s blast,
+  score awarded exactly once (single `died` emission), 20 s cooldown before
+  `F5` works again. Restart (`reload_current_scene`) and game-over
+  (`bullets`-group sweep) clear all boss state.
+- Normal enemy spawning continues during the fight under the existing cap.
 
 ## Difficulty
 
@@ -212,6 +238,20 @@ Press **F5** (Run Project), then verify:
    gun included); glowing bullets with short trails; white blink + spark on
    hit; ring explosion on kill. Hold `E` to spawn targets and watch with the
    minigun (`F2`) — frame rate should stay smooth (FX capped at 30).
+6. **Boss checklist** —
+   1. Press `F5`: `IRON BEHEMOTH INCOMING!` banner + big `IRON BEHEMOTH`
+      bar near the top.
+   2. Cat auto-fires at the boss (nearest-target rule, unchanged).
+   3. Back away: orange 5-shot fan after converging-arc telegraph.
+      Stand close: red-ring wind-up → shockwave (damage only inside).
+   4. Drop it below 30% HP: `BEHEMOTH ENRAGED!`, red aura + red bar,
+      faster attacks — triggers once.
+   5. Kill it: `BOSS DEFEATED! +50` exactly once, big blast, bar hides,
+      minions keep spawning.
+   6. Die / restart mid-fight: boss, its shots, and the bar are all gone.
+   7. Mash `F5`: never more than one boss (`BOSS ALREADY ACTIVE!`, then a
+      20 s `BOSS RECHARGING…` cooldown after a kill).
+   8. Godot debugger: no errors or invalid-instance warnings.
 
 ## Remaining manual adjustments
 
@@ -230,6 +270,8 @@ Press **F5** (Run Project), then verify:
 - [x] Weapon/ability/boss code inspected for syntax, node paths, groups and caps.
 - [x] Combat effects audit: muzzle/trail/hit/kill FX verified in code,
   default-gun muzzle flash added, node paths checked.
+- [x] Iron Behemoth: state machine, 3 attacks, enrage-once, death cleanup,
+  cooldown, HUD bar/title/banners inspected; node paths and groups verified.
 - [ ] **Not run-tested here** — Godot executable check was impossible in this
   environment (shell tool error `spawn EFTYPE`). See "Launch + visual check"
-  and "Remaining manual adjustments" above.
+  (boss checklist item 6) and "Remaining manual adjustments" above.

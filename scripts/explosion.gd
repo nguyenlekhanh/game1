@@ -8,11 +8,12 @@ var base_color: Color = Color(1.0, 0.6, 0.15)
 
 const MAX_FX := 30
 
-static func create(pos: Vector2, color: Color = Color(1.0, 0.6, 0.15), radius: float = 42.0) -> Explosion:
+static func create(pos: Vector2, color: Color = Color(1.0, 0.6, 0.15), radius: float = 42.0, duration: float = 0.35) -> Explosion:
 	var e := Explosion.new()
 	e.position = pos
 	e.base_color = color
 	e.max_radius = radius
+	e.duration = duration
 	return e
 
 static func fx_count(tree: SceneTree) -> int:
